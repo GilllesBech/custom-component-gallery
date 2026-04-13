@@ -21,7 +21,7 @@ If you have not built your component yet, start with the template linked above a
 Getting your component accepted requires two steps, both of which must be completed:
 
 1. **Open a pull request** to this repository with your component code and metadata
-2. **Submit the gallery form** at https://retoolcustomcomponents.netlify.app/
+2. **Submit the gallery form** at https://customcomponents.retool.com/
 
 Your submission will not be reviewed until both are done. When you open a pull request, a bot will post a comment reminding you to complete the form if you have not already.
 
