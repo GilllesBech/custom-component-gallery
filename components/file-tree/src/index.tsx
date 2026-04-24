@@ -7,8 +7,8 @@ import { Retool } from '@tryretool/custom-component-support'
 interface TreeNode {
   name: string
   type: 'file' | 'folder'
-  alias?: string      // nom d'affichage alternatif (remplace name dans l'arbre)
-  url?: string        // lien physique vers le fichier (NAS, Google Drive, Retool Files…)
+  alias?: string      // optional display name shown instead of name
+  url?: string        // physical link to the file (NAS, Google Drive, Retool Files…)
   children?: TreeNode[]
   [key: string]: unknown
 }
@@ -147,18 +147,18 @@ const ICON_REGISTRY: Record<IconName, IconFC> = {
 }
 
 const ICON_PALETTE: Array<{ name: IconName; label: string }> = [
-  { name: 'folder',           label: 'Dossier' },
-  { name: 'folder-open',      label: 'Dossier ouvert' },
-  { name: 'file',             label: 'Fichier' },
+  { name: 'folder',           label: 'Folder' },
+  { name: 'folder-open',      label: 'Folder open' },
+  { name: 'file',             label: 'File' },
   { name: 'file-pdf',         label: 'PDF' },
-  { name: 'file-text',        label: 'Texte / Markdown' },
+  { name: 'file-text',        label: 'Text / Markdown' },
   { name: 'file-code',        label: 'Code (ts, js, py…)' },
   { name: 'file-image',       label: 'Image (png, jpg…)' },
   { name: 'file-audio',       label: 'Audio (mp3, wav…)' },
-  { name: 'file-video',       label: 'Vidéo (mp4, mov…)' },
+  { name: 'file-video',       label: 'Video (mp4, mov…)' },
   { name: 'file-archive',     label: 'Archive (zip, tar…)' },
   { name: 'file-data',        label: 'Data (json, yaml…)' },
-  { name: 'file-spreadsheet', label: 'Tableur (xlsx, csv…)' },
+  { name: 'file-spreadsheet', label: 'Spreadsheet (xlsx, csv…)' },
 ]
 
 const DEFAULT_EXT_MAP: Record<string, IconName> = {
@@ -227,38 +227,38 @@ const DEFAULT_ALIGN: Record<ColumnDef['type'], React.CSSProperties['textAlign']>
   date: 'center', boolean: 'center', badge: 'left',
 }
 
-function formatCell(value: unknown, col: ColumnDef): { text: string; badgeColor?: string } {
+function formatCell(value: unknown, col: ColumnDef, locale: string): { text: string; badgeColor?: string } {
   if (value === null || value === undefined || value === '') return { text: '' }
   switch (col.type) {
     case 'text': return { text: String(value) }
     case 'number': {
       const n = Number(value); if (isNaN(n)) return { text: String(value) }
       const fmt = col.format ?? 'decimal:0'
-      if (fmt === 'integer') return { text: n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) }
+      if (fmt === 'integer') return { text: n.toLocaleString(locale, { maximumFractionDigits: 0 }) }
       if (fmt.startsWith('decimal:')) {
         const d = parseInt(fmt.split(':')[1] ?? '0')
-        return { text: n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) }
+        return { text: n.toLocaleString(locale, { minimumFractionDigits: d, maximumFractionDigits: d }) }
       }
       if (fmt === 'percent' || fmt.startsWith('percent:')) {
         const d = fmt.includes(':') ? parseInt(fmt.split(':')[1]) : 1
         return { text: (n * 100).toFixed(d) + ' %' }
       }
       if (fmt === 'filesize') {
-        const units = ['o', 'Ko', 'Mo', 'Go', 'To']
+        const units = ['B', 'KB', 'MB', 'GB', 'TB']
         let v = n, i = 0
         while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
         return { text: `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}` }
       }
-      return { text: n.toLocaleString('fr-FR') }
+      return { text: n.toLocaleString(locale) }
     }
     case 'currency': {
       const n = Number(value); if (isNaN(n)) return { text: String(value) }
-      return { text: new Intl.NumberFormat('fr-FR', { style: 'currency', currency: col.format ?? 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
+      return { text: new Intl.NumberFormat(locale, { style: 'currency', currency: col.format ?? 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) }
     }
     case 'date': {
       try {
         const d = new Date(String(value)); if (isNaN(d.getTime())) return { text: String(value) }
-        return { text: col.format === 'datetime' ? d.toLocaleString('fr-FR') : d.toLocaleDateString('fr-FR') }
+        return { text: col.format === 'datetime' ? d.toLocaleString(locale) : d.toLocaleDateString(locale) }
       } catch { return { text: String(value) } }
     }
     case 'boolean': return { text: value ? '✓' : '✗' }
@@ -314,7 +314,7 @@ const JsonCopyField: FC<{ value: string; label: string }> = ({ value, label }) =
     <div style={{ marginTop: 10, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          JSON à coller dans « {label} »
+          JSON to paste into "{label}"
         </span>
         <button
           onClick={copy}
@@ -356,16 +356,16 @@ const ColumnEditor: FC<{
   return (
     <div style={s.panel}>
       <div style={s.head}>
-        <span style={{ fontWeight: 600, color: '#111827' }}>⚙ Colonnes</span>
-        <button style={s.btn} onClick={onClose}>Fermer</button>
+        <span style={{ fontWeight: 600, color: '#111827' }}>⚙ Columns</span>
+        <button style={s.btn} onClick={onClose}>Close</button>
       </div>
 
       <div style={s.body}>
         {/* Column header labels */}
         {cols.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 1fr 68px 52px 24px', gap: 6, marginBottom: 4, fontSize: 10, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', alignItems: 'center' }}>
-            <span>Clé</span><span>Label</span><span>Type</span>
-            <span>Format</span><span>Align.</span><span>Larg.</span><span />
+            <span>Key</span><span>Label</span><span>Type</span>
+            <span>Format</span><span>Align.</span><span>Width</span><span />
           </div>
         )}
 
@@ -373,7 +373,7 @@ const ColumnEditor: FC<{
           <React.Fragment key={i}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px 1fr 68px 52px 24px', gap: 6, marginBottom: 6, alignItems: 'center' }}>
               {/* key */}
-              <input style={s.input} value={col.key} placeholder="clé"
+              <input style={s.input} value={col.key} placeholder="key"
                 onChange={e => upd(i, { key: e.target.value })} />
               {/* label */}
               <input style={s.input} value={col.label} placeholder="Label"
@@ -396,7 +396,7 @@ const ColumnEditor: FC<{
                     style={{ flex: 1, border: 'none', borderLeft: ai > 0 ? '1px solid #d1d5db' : 'none', cursor: 'pointer', padding: '4px 2px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', backgroundColor: col.align === a ? '#dbeafe' : '#fff', color: col.align === a ? '#1d4ed8' : '#6b7280' }}
                     title={a}
                     onClick={() => upd(i, { align: a })}>
-                    {a === 'left' ? 'G' : a === 'center' ? 'C' : 'D'}
+                    {a === 'left' ? 'L' : a === 'center' ? 'C' : 'R'}
                   </button>
                 ))}
               </div>
@@ -412,10 +412,10 @@ const ColumnEditor: FC<{
             {/* Badge colors row */}
             {col.type === 'badge' && (
               <div style={{ marginBottom: 10, marginLeft: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>Couleurs badge :</span>
+                <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>Badge colors:</span>
                 <input style={{ ...s.input, fontFamily: 'monospace', fontSize: 11 }}
                   value={col.colors ? JSON.stringify(col.colors) : ''}
-                  placeholder='{"actif":"#22c55e","inactif":"#ef4444"}'
+                  placeholder='{"active":"#22c55e","inactive":"#ef4444"}'
                   onChange={e => {
                     try { upd(i, { colors: JSON.parse(e.target.value) }) }
                     catch { /* wait for valid JSON */ }
@@ -427,15 +427,15 @@ const ColumnEditor: FC<{
 
         {cols.length === 0 && (
           <p style={{ color: '#9ca3af', fontSize: 12, textAlign: 'center', marginTop: 24 }}>
-            Aucune colonne — cliquez « + Ajouter » pour commencer.
+            No columns — click "+ Add column" to get started.
           </p>
         )}
       </div>
 
       <div style={s.foot}>
         <button style={{ ...s.btn, color: '#2563eb', borderColor: '#bfdbfe' }}
-          onClick={() => commit([...cols, { key: '', label: 'Nouvelle colonne', type: 'text', width: 100 }])}>
-          + Ajouter une colonne
+          onClick={() => commit([...cols, { key: '', label: 'New column', type: 'text', width: 100 }])}>
+          + Add column
         </button>
         <JsonCopyField value={JSON.stringify(cols)} label="columns" />
       </div>
@@ -486,13 +486,13 @@ const IconConfigEditor: FC<{
   return (
     <div style={s.panel}>
       <div style={s.head}>
-        <span style={{ fontWeight: 600, color: '#111827' }}>🎨 Icônes</span>
-        <button style={s.btn} onClick={onClose}>Fermer</button>
+        <span style={{ fontWeight: 600, color: '#111827' }}>🎨 Icons</span>
+        <button style={s.btn} onClick={onClose}>Close</button>
       </div>
 
       <div style={s.body}>
         {/* Palette */}
-        <div style={s.section}>Palette disponible</div>
+        <div style={s.section}>Available icons</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6, marginBottom: 20 }}>
           {ICON_PALETTE.map(({ name, label }) => {
             const Ico = ICON_REGISTRY[name]
@@ -509,10 +509,10 @@ const IconConfigEditor: FC<{
         </div>
 
         {/* Mappings */}
-        <div style={s.section}>Mappings extension → icône</div>
+        <div style={s.section}>Extension → icon mappings</div>
         <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>
-          Surcharge les associations par défaut. Utilisez <code>default</code> pour les extensions inconnues,
-          <code> folder</code> et <code>folder-open</code> pour les dossiers.
+          Overrides default associations. Use <code>default</code> for unknown extensions,
+          <code> folder</code> and <code>folder-open</code> for folders.
         </div>
 
         {mappings.map(({ id, ext, icon }) => {
@@ -536,7 +536,7 @@ const IconConfigEditor: FC<{
         })}
 
         <button style={{ ...s.btn, color: '#2563eb', borderColor: '#bfdbfe', marginTop: 4 }} onClick={add}>
-          + Ajouter un mapping
+          + Add mapping
         </button>
         <JsonCopyField value={JSON.stringify(toConfig(mappings))} label="iconConfig" />
       </div>
@@ -555,14 +555,14 @@ const DEFAULT_TREE_DATA = '{"name":"project","type":"folder","children":[{"name"
 export const FileTree: FC = () => {
   const [treeDataRaw] = Retool.useStateString({
     name: 'treeData',
-    initialValue: '{"name":"project","type":"folder","children":[{"name":"src","type":"folder","children":[{"name":"index.tsx","type":"file","size":4096,"modified":"2024-03-01","price":12.5,"status":"actif"},{"name":"App.tsx","type":"file","size":2048,"modified":"2024-02-20","price":8.0,"status":"brouillon"}]},{"name":"README.md","type":"file","size":512,"modified":"2024-01-15","price":0,"status":"publié"},{"name":"package.json","type":"file","size":1024,"modified":"2024-03-01","price":0,"status":"actif"}]}',
+    initialValue: '{"name":"Books","type":"folder","children":[{"name":"Tales","type":"folder","children":[{"alias":"Alice in Wonderland","name":"level-2-alices-adventures-in-wonderland-penguin-readers.pdf","title":"Alice in Wonderland","type":"file","added":"2026-03-01","status":"recent","url":"https://andresteaching.wordpress.com/wp-content/uploads/2011/08/level-2-alices-adventures-in-wonderland-penguin-readers.pdf"},{"name":"grimm10.pdf","title":"Grimm Brothers Tales","type":"file","added":"2026-04-01","status":"new","url":"https://www.gutenberg.org/files/2591/old/grimm10.pdf"}]},{"name":"Classics","type":"folder","children":[{"name":"Marspathfinder.pdf","title":"Marspathfinder","type":"file","added":"2026-03-01","status":"recent","url":"https://upload.wikimedia.org/wikipedia/commons/1/14/Marspathfinder.pdf"},{"name":"Romeo%20and%20Juliet%20-%20William%20Shakespeare.pdf","title":"Romeo and Juliet","type":"file","added":"2024-03-01","status":"basic","url":"https://ebook-mecca.com/online/Romeo%20and%20Juliet%20-%20William%20Shakespeare.pdf"}]}]}',
   })
 
   const [columnsRaw, setColumnsRaw] = Retool.useStateString({
     name: 'columns',
     label: 'Columns',
     description: 'JSON array of column definitions. Each item: { key, label, type (text|number|date|boolean|badge|currency), format?, align? (left|center|right), width?, colors? }. Use the ⚙ editor (showEditors: true) for a visual editor.',
-    initialValue: '[{"key":"size","label":"Taille","type":"number","format":"filesize","align":"right","width":80},{"key":"modified","label":"Modifié","type":"date","align":"center","width":100},{"key":"price","label":"Prix","type":"currency","format":"EUR","align":"right","width":90},{"key":"status","label":"Statut","type":"badge","colors":{"actif":"#22c55e","brouillon":"#f59e0b","publié":"#3b82f6"},"width":80}]',
+    initialValue: '[{"key":"title","label":"Title","type":"text","align":"left","width":150},{"key":"added","label":"Added","type":"date","align":"center","width":100},{"key":"status","label":"Status","type":"badge","colors":{"recent":"#22c55e","new":"#f59e0b","basic":"#3b82f6"},"width":80}]',
   })
 
   const [iconConfigRaw, setIconConfigRaw] = Retool.useStateString({
@@ -696,7 +696,15 @@ export const FileTree: FC = () => {
     name: 'nameColumnLabel',
     label: 'Name column label',
     description: 'Label for the first (name) column header.',
-    initialValue: 'Nom',
+    initialValue: 'Name',
+    inspector: 'text',
+  })
+
+  const [locale] = Retool.useStateString({
+    name: 'locale',
+    label: 'Locale',
+    description: 'BCP 47 locale used for number, date and currency formatting (e.g. en-US, fr-FR, de-DE, ja-JP). Leave empty to use the browser default.',
+    initialValue: '',
     inspector: 'text',
   })
 
@@ -793,7 +801,8 @@ export const FileTree: FC = () => {
   const resolvedSelectedTextColor = selectedTextColor || getContrastColor(resolvedSelectedBg)
   const resolvedHoverTextColor    = hoverTextColor    || getContrastColor(resolvedHoverBg)
   const resolvedHeaderTextColor   = headerTextColor   || getContrastColor(resolvedHeaderBg)
-  const resolvedNameLabel         = nameColumnLabel   || 'Nom'
+  const resolvedNameLabel         = nameColumnLabel   || 'Name'
+  const resolvedLocale            = locale            || navigator.language || 'en-US'
 
   // Inject scoped styles with !important so they beat any Retool iframe CSS reset
   useEffect(() => {
@@ -840,7 +849,7 @@ export const FileTree: FC = () => {
       {/* Erreur JSON visible uniquement si treeData est vraiment malformé */}
       {treeDataError && (
         <div style={{ padding: '4px 8px', backgroundColor: '#fef2f2', borderBottom: '1px solid #fecaca', fontSize: 11, color: '#b91c1c' }}>
-          treeData invalide — arbre par défaut affiché.
+          Invalid treeData — showing default tree.
         </div>
       )}
 
@@ -849,11 +858,11 @@ export const FileTree: FC = () => {
         <div style={toolbarStyle}>
           <button style={toolBtnStyle(editorMode === 'columns')}
             onClick={() => setEditorMode(m => m === 'columns' ? null : 'columns')}>
-            ⚙ Colonnes
+            ⚙ Columns
           </button>
           <button style={toolBtnStyle(editorMode === 'icons')}
             onClick={() => setEditorMode(m => m === 'icons' ? null : 'icons')}>
-            🎨 Icônes
+            🎨 Icons
           </button>
         </div>
       )}
@@ -911,7 +920,7 @@ export const FileTree: FC = () => {
                 </div>
 
                 {columns.map(col => {
-                  const { text, badgeColor } = formatCell(node[col.key], col)
+                  const { text, badgeColor } = formatCell(node[col.key], col, resolvedLocale)
                   const align   = col.align ?? DEFAULT_ALIGN[col.type]
                   const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start'
                   return (
